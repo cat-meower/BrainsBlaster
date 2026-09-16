@@ -25,22 +25,28 @@ let W=innerWidth,H=innerHeight,dpr=1;
 function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const keys=new Set();addEventListener('keydown',e=>{keys.add(e.key.toLowerCase());if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault()});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 const mouse={x:W/2,y:H/2,down:false};addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});addEventListener('pointerdown',e=>{if(e.button===0)mouse.down=true});addEventListener('pointerup',e=>{if(e.button===0)mouse.down=false});
-const player={x:W/2,y:H/2,r:16,speed:3.5,hp:100,cool:0,damage:1,bulletSize:4,doubleBarrel:false};
+const player={x:W/2,y:H/2,r:16,speed:3.5,hp:100,cool:0,damage:1,bulletSize:4,bulletSpeed:10,doubleBarrel:false};
 let bullets=[],zombies=[],particles=[],drops=[],wave=1,kills=0,spawnLeft=5,spawnTimer=0,between=false,last=performance.now();
 const upgradeInfo={
  power:{name:'Power Blast',desc:'More damage',color:'#ff5a5a'},
  barrel:{name:'Big Barrrel',desc:'Bigger projectiles',color:'#5aa7ff'},
  legs:{name:'Leg Day',desc:'Move faster',color:'#7cff4d'},
- double:{name:'Double Barrel',desc:'Next shot fires twice',color:'#ffd84d'}
+ speed:{name:'Speed Shot',desc:'Faster projectiles',color:'#c77dff'},
+ double:{name:'Double Barrel',desc:'Fires two projectiles',color:'#ffd84d'}
 };
 const collected=new Set();
 function rand(a,b){return Math.random()*(b-a)+a}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function spawnZombie(){let side=Math.floor(Math.random()*4),x,y;if(side===0){x=rand(0,W);y=-30}else if(side===1){x=W+30;y=rand(0,H)}else if(side===2){x=rand(0,W);y=H+30}else{x=-30;y=rand(0,H)}zombies.push({x,y,r:17,speed:rand(.65,.95)+wave*.035,hp:2,maxHp:2,hit:0})}
 function startWave(){spawnLeft=5+(wave-1)*3;spawnTimer=0;between=false;waveEl.textContent=wave}
-function dropUpgrade(x,y){if(Math.random()>0.22)return;const available=Object.keys(upgradeInfo).filter(k=>k!=='double'||!collected.has(k));if(!available.length)return;const type=available[Math.floor(Math.random()*available.length)];drops.push({x,y,r:15,type,bob:rand(0,Math.PI*2)})}
-function applyUpgrade(type){if(type==='power'){player.damage+=1;collected.add(type)}else if(type==='barrel'){player.bulletSize+=2;collected.add(type)}else if(type==='legs'){player.speed+=1.2;collected.add(type)}else if(type==='double'){player.doubleBarrel=true;collected.add(type)}updateCards()}
-function updateCards(){cardsEl.innerHTML='';for(const type of collected){const info=upgradeInfo[type];const el=document.createElement('div');el.className='mini-card';el.style.borderColor=info.color;el.textContent=info.name+(type==='double'?' • READY':'');cardsEl.appendChild(el)}}
-function shoot(){if(player.cool>0||player.hp<=0)return;player.cool=9;let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);let angles=player.doubleBarrel?[a-0.09,a+0.09]:[a];for(const angle of angles)bullets.push({x:player.x+Math.cos(angle)*20,y:player.y+Math.sin(angle)*20,vx:Math.cos(angle)*10,vy:Math.sin(angle)*10,r:player.bulletSize,damage:player.damage});if(player.doubleBarrel){player.doubleBarrel=false;collected.delete('double');updateCards()}}
+function dropUpgrade(x,y){
+ let type;
+ if(!collected.has('double')&&Math.random()<0.03){type='double'}
+ else {if(Math.random()>0.22)return;const available=['power','barrel','legs','speed'];type=available[Math.floor(Math.random()*available.length)]}
+ drops.push({x,y,r:15,type,bob:rand(0,Math.PI*2)})
+}
+function applyUpgrade(type){if(type==='power'){player.damage+=1;collected.add(type)}else if(type==='barrel'){player.bulletSize+=2;collected.add(type)}else if(type==='legs'){player.speed+=1.2;collected.add(type)}else if(type==='speed'){player.bulletSpeed+=4;collected.add(type)}else if(type==='double'){player.doubleBarrel=true;collected.add(type)}updateCards()}
+function updateCards(){cardsEl.innerHTML='';for(const type of collected){const info=upgradeInfo[type];const el=document.createElement('div');el.className='mini-card';el.style.borderColor=info.color;el.textContent=info.name;cardsEl.appendChild(el)}}
+function shoot(){if(player.cool>0||player.hp<=0)return;player.cool=9;let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);let angles=player.doubleBarrel?[a-0.09,a+0.09]:[a];for(const angle of angles)bullets.push({x:player.x+Math.cos(angle)*20,y:player.y+Math.sin(angle)*20,vx:Math.cos(angle)*player.bulletSpeed,vy:Math.sin(angle)*player.bulletSpeed,r:player.bulletSize,damage:player.damage})}
 function burst(x,y,n=8){for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-2,2),vy:rand(-2,2),life:rand(15,35)})}
 function update(dt){
  let dx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);let dy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);let len=Math.hypot(dx,dy)||1;player.x=Math.max(player.r,Math.min(W-player.r,player.x+dx/len*player.speed*dt));player.y=Math.max(player.r,Math.min(H-player.r,player.y+dy/len*player.speed*dt));
@@ -63,7 +69,7 @@ function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#263238';ctx.fillRect(0,0,
  if(between){ctx.fillStyle='#fff';ctx.font='bold 32px Arial';ctx.textAlign='center';ctx.fillText('WAVE CLEARED',W/2,H/2)}
  if(player.hp<=0){ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#ff5555';ctx.font='bold 56px Arial';ctx.textAlign='center';ctx.fillText('GAME OVER',W/2,H/2-20);ctx.font='bold 20px Arial';ctx.fillStyle='#fff';ctx.fillText('Press R to restart',W/2,H/2+25)}
 }
-addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&player.hp<=0){player.x=W/2;player.y=H/2;player.hp=100;player.speed=3.5;player.damage=1;player.bulletSize=4;player.doubleBarrel=false;collected.clear();updateCards();wave=1;kills=0;killsEl.textContent=0;startWave();document.getElementById('help').textContent='WASD / Arrow keys to move • Mouse to aim • Click to shoot'}});
+addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&player.hp<=0){player.x=W/2;player.y=H/2;player.hp=100;player.speed=3.5;player.damage=1;player.bulletSize=4;player.bulletSpeed=10;player.doubleBarrel=false;collected.clear();updateCards();wave=1;kills=0;killsEl.textContent=0;startWave();document.getElementById('help').textContent='WASD / Arrow keys to move • Mouse to aim • Click to shoot'}});
 document.getElementById('play').onclick=()=>{document.getElementById('start').remove();startWave()};
 function loop(t){let dt=Math.min(2,(t-last)/16.67);last=t;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
 </script></body></html>
