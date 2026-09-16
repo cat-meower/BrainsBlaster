@@ -5,26 +5,42 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BrainsBlaster</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:#fff;font-family:Arial,sans-serif}canvas{display:block;width:100vw;height:100vh;background:#20252a}#hud{position:fixed;top:16px;left:16px;right:16px;display:flex;justify-content:space-between;pointer-events:none;font-weight:800;text-shadow:2px 2px #000}#title{font-size:28px;color:#7cff4d}#stats{font-size:18px;text-align:right}#help{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font-size:14px;opacity:.8;text-align:center;pointer-events:none}#start{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle,#26313a,#090b0d);z-index:5}.panel{text-align:center}.panel h1{font-size:72px;margin:0 0 10px;color:#7cff4d;text-shadow:5px 5px #000}.panel p{font-size:18px;opacity:.8}.panel button{margin-top:18px;border:0;border-radius:12px;padding:18px 42px;font-size:24px;font-weight:900;background:#7cff4d;cursor:pointer;box-shadow:0 6px #3d9e27}.panel button:active{transform:translateY(5px);box-shadow:0 1px #3d9e27}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:#fff;font-family:Arial,sans-serif}canvas{display:block;width:100vw;height:100vh;background:#20252a}
+#hud{position:fixed;top:16px;left:16px;right:16px;display:flex;justify-content:space-between;pointer-events:none;font-weight:800;text-shadow:2px 2px #000;z-index:2}#title{font-size:28px;color:#7cff4d}#stats{font-size:18px;text-align:right}
+#help{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font-size:14px;opacity:.8;text-align:center;pointer-events:none;z-index:2}
+#cards{position:fixed;left:16px;bottom:48px;display:flex;gap:8px;flex-wrap:wrap;max-width:430px;pointer-events:none;z-index:3}.mini-card{border:2px solid #fff;border-radius:8px;padding:6px 9px;background:rgba(0,0,0,.7);font-size:12px;font-weight:800;text-shadow:1px 1px #000}
+#start{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle,#26313a,#090b0d);z-index:5}.panel{text-align:center}.panel h1{font-size:72px;margin:0 0 10px;color:#7cff4d;text-shadow:5px 5px #000}.panel p{font-size:18px;opacity:.8}.panel button{margin-top:18px;border:0;border-radius:12px;padding:18px 42px;font-size:24px;font-weight:900;background:#7cff4d;cursor:pointer;box-shadow:0 6px #3d9e27}.panel button:active{transform:translateY(5px);box-shadow:0 1px #3d9e27}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="hud"><div id="title">BRAINBLASTER</div><div id="stats">HP: <span id="hp">100</span> &nbsp; Wave: <span id="wave">1</span> &nbsp; Kills: <span id="kills">0</span></div></div>
+<div id="cards"></div>
 <div id="help">WASD / Arrow keys to move • Mouse to aim • Click to shoot</div>
 <div id="start"><div class="panel"><h1>BRAINBLASTER</h1><p>Survive the waves.</p><button id="play">PLAY</button></div></div>
 <script>
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
-const hpEl=document.getElementById('hp'),waveEl=document.getElementById('wave'),killsEl=document.getElementById('kills');
+const hpEl=document.getElementById('hp'),waveEl=document.getElementById('wave'),killsEl=document.getElementById('kills'),cardsEl=document.getElementById('cards');
 let W=innerWidth,H=innerHeight,dpr=1;
 function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const keys=new Set();addEventListener('keydown',e=>{keys.add(e.key.toLowerCase());if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault()});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 const mouse={x:W/2,y:H/2,down:false};addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});addEventListener('pointerdown',e=>{if(e.button===0)mouse.down=true});addEventListener('pointerup',e=>{if(e.button===0)mouse.down=false});
-const player={x:W/2,y:H/2,r:16,speed:3.5,hp:100,cool:0};let bullets=[],zombies=[],particles=[],wave=1,kills=0,spawnLeft=5,spawnTimer=0,between=false,last=performance.now();
+const player={x:W/2,y:H/2,r:16,speed:3.5,hp:100,cool:0,damage:1,bulletSize:4,doubleBarrel:false};
+let bullets=[],zombies=[],particles=[],drops=[],wave=1,kills=0,spawnLeft=5,spawnTimer=0,between=false,last=performance.now();
+const upgradeInfo={
+ power:{name:'Power Blast',desc:'More damage',color:'#ff5a5a'},
+ barrel:{name:'Big Barrrel',desc:'Bigger projectiles',color:'#5aa7ff'},
+ legs:{name:'Leg Day',desc:'Move faster',color:'#7cff4d'},
+ double:{name:'Double Barrel',desc:'Next shot fires twice',color:'#ffd84d'}
+};
+const collected=new Set();
 function rand(a,b){return Math.random()*(b-a)+a}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function spawnZombie(){let side=Math.floor(Math.random()*4),x,y;if(side===0){x=rand(0,W);y=-30}else if(side===1){x=W+30;y=rand(0,H)}else if(side===2){x=rand(0,W);y=H+30}else{x=-30;y=rand(0,H)}zombies.push({x,y,r:17,speed:rand(.65,.95)+wave*.035,hp:2,maxHp:2,hit:0})}
 function startWave(){spawnLeft=5+(wave-1)*3;spawnTimer=0;between=false;waveEl.textContent=wave}
-function shoot(){if(player.cool>0)return;player.cool=9;let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);bullets.push({x:player.x+Math.cos(a)*20,y:player.y+Math.sin(a)*20,vx:Math.cos(a)*10,vy:Math.sin(a)*10,r:4})}
+function dropUpgrade(x,y){if(Math.random()>0.22)return;const available=Object.keys(upgradeInfo).filter(k=>k!=='double'||!collected.has(k));if(!available.length)return;const type=available[Math.floor(Math.random()*available.length)];drops.push({x,y,r:15,type,bob:rand(0,Math.PI*2)})}
+function applyUpgrade(type){if(type==='power'){player.damage+=1;collected.add(type)}else if(type==='barrel'){player.bulletSize+=2;collected.add(type)}else if(type==='legs'){player.speed+=1.2;collected.add(type)}else if(type==='double'){player.doubleBarrel=true;collected.add(type)}updateCards()}
+function updateCards(){cardsEl.innerHTML='';for(const type of collected){const info=upgradeInfo[type];const el=document.createElement('div');el.className='mini-card';el.style.borderColor=info.color;el.textContent=info.name+(type==='double'?' • READY':'');cardsEl.appendChild(el)}}
+function shoot(){if(player.cool>0||player.hp<=0)return;player.cool=9;let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);let angles=player.doubleBarrel?[a-0.09,a+0.09]:[a];for(const angle of angles)bullets.push({x:player.x+Math.cos(angle)*20,y:player.y+Math.sin(angle)*20,vx:Math.cos(angle)*10,vy:Math.sin(angle)*10,r:player.bulletSize,damage:player.damage});if(player.doubleBarrel){player.doubleBarrel=false;collected.delete('double');updateCards()}}
 function burst(x,y,n=8){for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-2,2),vy:rand(-2,2),life:rand(15,35)})}
 function update(dt){
  let dx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);let dy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);let len=Math.hypot(dx,dy)||1;player.x=Math.max(player.r,Math.min(W-player.r,player.x+dx/len*player.speed*dt));player.y=Math.max(player.r,Math.min(H-player.r,player.y+dy/len*player.speed*dt));
@@ -33,11 +49,13 @@ function update(dt){
  for(const b of bullets){b.x+=b.vx*dt;b.y+=b.vy*dt}
  bullets=bullets.filter(b=>b.x>-20&&b.x<W+20&&b.y>-20&&b.y<H+20);
  for(const z of zombies){let a=Math.atan2(player.y-z.y,player.x-z.x);z.x+=Math.cos(a)*z.speed*dt;z.y+=Math.sin(a)*z.speed*dt;z.hit=Math.max(0,z.hit-dt);if(dist(z,player)<z.r+player.r&&z.hit<=0){player.hp=Math.max(0,player.hp-6);z.hit=35;burst(player.x,player.y,3)}}
- for(let i=bullets.length-1;i>=0;i--){let b=bullets[i];for(let j=zombies.length-1;j>=0;j--){let z=zombies[j];if(dist(b,z)<b.r+z.r){bullets.splice(i,1);z.hp--;z.hit=5;if(z.hp<=0){zombies.splice(j,1);kills++;burst(z.x,z.y,12);killsEl.textContent=kills}break}}}
+ for(let i=bullets.length-1;i>=0;i--){let b=bullets[i];for(let j=zombies.length-1;j>=0;j--){let z=zombies[j];if(dist(b,z)<b.r+z.r){bullets.splice(i,1);z.hp-=b.damage;z.hit=5;if(z.hp<=0){zombies.splice(j,1);kills++;dropUpgrade(z.x,z.y);burst(z.x,z.y,12);killsEl.textContent=kills}break}}}
+ for(let i=drops.length-1;i>=0;i--){const d=drops[i];d.bob+=0.06*dt;if(dist(d,player)<d.r+player.r+4){applyUpgrade(d.type);drops.splice(i,1);burst(d.x,d.y,7)}}
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);
  hpEl.textContent=Math.ceil(player.hp);if(player.hp<=0){mouse.down=false;document.getElementById('help').textContent='You got eaten. Press R to restart.'}
 }
 function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#263238';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#303a40';ctx.lineWidth=1;for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ for(const d of drops){const info=upgradeInfo[d.type];const bob=Math.sin(d.bob)*3;ctx.save();ctx.translate(d.x,d.y+bob);ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(-18,12,36,5);ctx.fillStyle='#15191c';ctx.fillRect(-24,-30,48,60);ctx.strokeStyle=info.color;ctx.lineWidth=3;ctx.strokeRect(-24,-30,48,60);ctx.fillStyle=info.color;ctx.fillRect(-20,-26,40,18);ctx.fillStyle='#111';ctx.font='bold 8px Arial';ctx.textAlign='center';ctx.fillText(info.name.toUpperCase(),0,-13);ctx.fillStyle='#fff';ctx.font='bold 7px Arial';ctx.fillText(info.desc,0,5);ctx.font='bold 6px Arial';ctx.fillText('PICK UP',0,18);ctx.restore()}
  for(const b of bullets){ctx.fillStyle='#ffe66d';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill()}
  for(const z of zombies){ctx.fillStyle=z.hit>0?'#fff':'#69c94a';ctx.beginPath();ctx.arc(z.x,z.y,z.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(z.x-6,z.y-3,3,0,Math.PI*2);ctx.arc(z.x+6,z.y-3,3,0,Math.PI*2);ctx.fill();ctx.fillStyle='#b22';ctx.fillRect(z.x-9,z.y+7,18,3)}
  let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);ctx.save();ctx.translate(player.x,player.y);ctx.rotate(a);ctx.fillStyle='#4f83ff';ctx.fillRect(-14,-14,28,28);ctx.fillStyle='#222';ctx.fillRect(7,-4,22,8);ctx.restore();
@@ -45,7 +63,7 @@ function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#263238';ctx.fillRect(0,0,
  if(between){ctx.fillStyle='#fff';ctx.font='bold 32px Arial';ctx.textAlign='center';ctx.fillText('WAVE CLEARED',W/2,H/2)}
  if(player.hp<=0){ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#ff5555';ctx.font='bold 56px Arial';ctx.textAlign='center';ctx.fillText('GAME OVER',W/2,H/2-20);ctx.font='bold 20px Arial';ctx.fillStyle='#fff';ctx.fillText('Press R to restart',W/2,H/2+25)}
 }
-addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&player.hp<=0){player.x=W/2;player.y=H/2;player.hp=100;wave=1;kills=0;killsEl.textContent=0;startWave();document.getElementById('help').textContent='WASD / Arrow keys to move • Mouse to aim • Click to shoot'}});
+addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&player.hp<=0){player.x=W/2;player.y=H/2;player.hp=100;player.speed=3.5;player.damage=1;player.bulletSize=4;player.doubleBarrel=false;collected.clear();updateCards();wave=1;kills=0;killsEl.textContent=0;startWave();document.getElementById('help').textContent='WASD / Arrow keys to move • Mouse to aim • Click to shoot'}});
 document.getElementById('play').onclick=()=>{document.getElementById('start').remove();startWave()};
 function loop(t){let dt=Math.min(2,(t-last)/16.67);last=t;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
 </script></body></html>
