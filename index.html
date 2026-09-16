@@ -28,7 +28,7 @@ const mouse={x:W/2,y:H/2,down:false};addEventListener('pointermove',e=>{mouse.x=
 const player={x:W/2,y:H/2,r:16,speed:3.5,hp:100,cool:0,damage:1,bulletSize:4,bulletSpeed:10,doubleBarrel:false,barrage:0};
 let bullets=[],zombies=[],particles=[],drops=[],wave=1,kills=0,spawnLeft=5,spawnTimer=0,between=false,last=performance.now();
 const upgradeInfo={
- power:{name:'Power Blast',desc:'Damage x1.35',color:'#ff5a5a'},
+ power:{name:'Power Blast',desc:'Damage x1.4',color:'#ff5a5a'},
  barrel:{name:'Big Barrrel',desc:'Bigger projectiles',color:'#5aa7ff'},
  legs:{name:'Leg Day',desc:'Move faster',color:'#7cff4d'},
  speed:{name:'Speed Shot',desc:'Faster projectiles',color:'#c77dff'},
@@ -38,19 +38,24 @@ const upgradeInfo={
 const collected=new Set();
 function rand(a,b){return Math.random()*(b-a)+a}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function spawnZombie(){let side=Math.floor(Math.random()*4),x,y;if(side===0){x=rand(0,W);y=-30}else if(side===1){x=W+30;y=rand(0,H)}else if(side===2){x=rand(0,W);y=H+30}else{x=-30;y=rand(0,H)}
- let tank=wave>=5;let hp=tank?Math.floor(rand(13,19)):Math.floor(rand(4,8));let r=tank?25:17;let speed=tank?rand(.45,.7)+wave*.02:rand(.65,.95)+wave*.035;zombies.push({x,y,r,speed,hp,maxHp:hp,hit:0,tank})}
+ let tank=false;
+ if(wave===2)tank=Math.random()<0.12;
+ else if(wave===3)tank=Math.random()<0.28;
+ else if(wave===4)tank=Math.random()<0.50;
+ else if(wave>=5)tank=Math.random()<0.72;
+ let hp=tank?Math.floor(rand(13,19)):Math.floor(rand(4,8));let r=tank?25:17;let speed=tank?rand(.45,.7)+wave*.02:rand(.65,.95)+wave*.035;zombies.push({x,y,r,speed,hp,maxHp:hp,hit:0,tank})}
 function startWave(){spawnLeft=5+(wave-1)*3;spawnTimer=0;between=false;waveEl.textContent=wave}
 function dropUpgrade(x,y){
  let roll=Math.random()*100,type=null;
- if(roll<0.5&&!collected.has('double'))type='double';
- else if(roll<2.5)type='power';
- else if(roll<4.5)type='barrel';
- else if(roll<6.5)type='legs';
- else if(roll<8.5)type='speed';
- else if(roll<10.5)type='barrage';
+ if(roll<1&&!collected.has('double'))type='double';
+ else if(roll<4)type='power';
+ else if(roll<7)type='barrel';
+ else if(roll<10)type='legs';
+ else if(roll<13)type='speed';
+ else if(roll<16)type='barrage';
  if(type)drops.push({x,y,r:15,type,bob:rand(0,Math.PI*2),life:600})
 }
-function applyUpgrade(type){if(type==='power'){player.damage*=1.35;collected.add(type)}else if(type==='barrel'){player.bulletSize+=2;collected.add(type)}else if(type==='legs'){player.speed+=1.2;collected.add(type)}else if(type==='speed'){player.bulletSpeed+=4;collected.add(type)}else if(type==='double'){player.doubleBarrel=true;collected.add(type)}else if(type==='barrage'){player.barrage=300}updateCards()}
+function applyUpgrade(type){if(type==='power'){player.damage*=1.4;collected.add(type)}else if(type==='barrel'){player.bulletSize+=2;collected.add(type)}else if(type==='legs'){player.speed+=1.2;collected.add(type)}else if(type==='speed'){player.bulletSpeed+=4;collected.add(type)}else if(type==='double'){player.doubleBarrel=true;collected.add(type)}else if(type==='barrage'){player.barrage=300}updateCards()}
 function updateCards(){cardsEl.innerHTML='';for(const type of collected){const info=upgradeInfo[type];const el=document.createElement('div');el.className='mini-card';el.style.borderColor=info.color;el.textContent=info.name;cardsEl.appendChild(el)}}
 function shoot(){if(player.cool>0||player.hp<=0)return;player.cool=9;let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);let angles=player.doubleBarrel?[a-0.09,a+0.09]:[a];for(const angle of angles)bullets.push({x:player.x+Math.cos(angle)*20,y:player.y+Math.sin(angle)*20,vx:Math.cos(angle)*player.bulletSpeed,vy:Math.sin(angle)*player.bulletSpeed,r:player.bulletSize,damage:player.damage})}
 function burst(x,y,n=8){for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-2,2),vy:rand(-2,2),life:rand(15,35)})}
