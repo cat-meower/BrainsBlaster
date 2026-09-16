@@ -10,6 +10,8 @@
 #help{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font-size:14px;opacity:.8;text-align:center;pointer-events:none;z-index:2}
 #cards{position:fixed;left:16px;bottom:48px;display:flex;gap:8px;flex-wrap:wrap;max-width:430px;pointer-events:none;z-index:3}.mini-card{border:2px solid #fff;border-radius:8px;padding:6px 9px;background:rgba(0,0,0,.7);font-size:12px;font-weight:800;text-shadow:1px 1px #000}
 #start{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle,#26313a,#090b0d);z-index:5}.panel{text-align:center}.panel h1{font-size:72px;margin:0 0 10px;color:#7cff4d;text-shadow:5px 5px #000}.panel p{font-size:18px;opacity:.8}.panel button{margin-top:18px;border:0;border-radius:12px;padding:18px 42px;font-size:24px;font-weight:900;background:#7cff4d;cursor:pointer;box-shadow:0 6px #3d9e27}.panel button:active{transform:translateY(5px);box-shadow:0 1px #3d9e27}
+#cheatToggleRow{margin:18px auto 0;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:900;font-size:15px;color:#ffcf4a}.switch{position:relative;display:inline-block;width:52px;height:28px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;inset:0;cursor:pointer;background:#3a4146;border:2px solid #666;border-radius:28px;transition:.2s}.slider:before{content:"";position:absolute;width:20px;height:20px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s}.switch input:checked+.slider{background:#ff9f43;border-color:#ffcf4a}.switch input:checked+.slider:before{transform:translateX(24px)}
+#cheats{position:fixed;top:72px;left:16px;width:220px;background:rgba(16,20,23,.94);border:2px solid #ff9f43;border-radius:10px;padding:10px;z-index:4;display:none;box-shadow:0 6px 20px rgba(0,0,0,.45)}#cheats.open{display:block}#cheats h3{margin:0 0 8px;color:#ffcf4a;font-size:16px}#cheats button{width:100%;margin:3px 0;padding:7px 8px;border:1px solid #555;border-radius:6px;background:#263238;color:#fff;font-weight:800;cursor:pointer}#cheats button:hover{background:#34424a}#cheats .note{font-size:10px;color:#aaa;margin-top:6px;line-height:1.3}
 </style>
 </head>
 <body>
@@ -17,10 +19,12 @@
 <div id="hud"><div id="title">BRAINBLASTER</div><div id="stats">HP: <span id="hp">100</span> &nbsp; Wave: <span id="wave">1</span> &nbsp; Kills: <span id="kills">0</span></div></div>
 <div id="cards"></div>
 <div id="help">WASD / Arrow keys to move • Mouse to aim • Click to shoot</div>
-<div id="start"><div class="panel"><h1>BRAINBLASTER</h1><p>Survive the waves.</p><button id="play">PLAY</button></div></div>
+<div id="cheats"><h3>CHEAT PANEL</h3><button data-cheat="wave">Skip to Wave 10</button><button data-cheat="clear">Clear Zombies</button><button data-cheat="heal">Full Heal</button><button data-cheat="power">Give Power Blast</button><button data-cheat="barrel">Give Big Barrrel</button><button data-cheat="legs">Give Leg Day</button><button data-cheat="speed">Give Speed Shot</button><button data-cheat="double">Give Double Barrel</button><button data-cheat="barrage">Give Bullet Barrage</button><button data-cheat="pierce">Give Pierce</button><div class="note">Cheats are local to this game session and are enabled from the start screen.</div></div>
+<div id="start"><div class="panel"><h1>BRAINBLASTER</h1><p>Survive the waves.</p><div id="cheatToggleRow"><span>CHEATS</span><label class="switch"><input id="cheatToggle" type="checkbox"><span class="slider"></span></label><span id="cheatState">OFF</span></div><button id="play">PLAY</button></div></div>
 <script>
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
 const hpEl=document.getElementById('hp'),waveEl=document.getElementById('wave'),killsEl=document.getElementById('kills'),cardsEl=document.getElementById('cards');
+const cheatToggle=document.getElementById('cheatToggle'),cheatState=document.getElementById('cheatState'),cheatsEl=document.getElementById('cheats');
 let W=innerWidth,H=innerHeight,dpr=1;
 function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const keys=new Set();addEventListener('keydown',e=>{keys.add(e.key.toLowerCase());if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault()});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
@@ -57,8 +61,12 @@ function dropUpgrade(x,y){
  else if(roll<17&&!collected.has('pierce'))type='pierce';
  if(type)drops.push({x,y,r:15,type,bob:rand(0,Math.PI*2),life:600})
 }
-function applyUpgrade(type){if(type==='power'){player.damage*=1.4;collected.add(type)}else if(type==='barrel'){player.bulletSize+=2;collected.add(type)}else if(type==='legs'){player.speed+=1.2;collected.add(type)}else if(type==='speed'){player.bulletSpeed+=4;collected.add(type)}else if(type==='double'){player.doubleBarrel=true;collected.add(type)}else if(type==='barrage'){player.barrage=300}else if(type==='pierce'){player.pierce+=1;collected.add(type)}updateCards()}
+function applyUpgrade(type){if(type==='power'){player.damage*=1.4;collected.add(type)}else if(type==='barrel'){player.bulletSize=Math.min(10,player.bulletSize+2);collected.add(type)}else if(type==='legs'){player.speed+=1.2;collected.add(type)}else if(type==='speed'){player.bulletSpeed+=4;collected.add(type)}else if(type==='double'){player.doubleBarrel=true;collected.add(type)}else if(type==='barrage'){player.barrage=300}else if(type==='pierce'){player.pierce+=1;collected.add(type)}updateCards()}
 function updateCards(){cardsEl.innerHTML='';for(const type of collected){const info=upgradeInfo[type];const el=document.createElement('div');el.className='mini-card';el.style.borderColor=info.color;el.textContent=info.name;cardsEl.appendChild(el)}}
+function cheatAction(type){if(type==='wave'){wave=10;zombies=[];bullets=[];drops=[];fireBursts=[];between=false;startWave()}else if(type==='clear'){zombies=[]}else if(type==='heal'){player.hp=100;hpEl.textContent=100}else applyUpgrade(type)}
+function setCheatsEnabled(enabled){cheatState.textContent=enabled?'ON':'OFF';cheatState.style.color=enabled?'#7cff4d':'#ff7777';cheatsEl.classList.toggle('open',enabled)}
+cheatToggle.addEventListener('change',()=>setCheatsEnabled(cheatToggle.checked));
+for(const button of document.querySelectorAll('[data-cheat]'))button.addEventListener('click',()=>cheatAction(button.dataset.cheat));
 function shoot(){if(player.cool>0||player.hp<=0)return;player.cool=9;let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);let angles=player.doubleBarrel?[a-0.09,a+0.09]:[a];for(const angle of angles)bullets.push({x:player.x+Math.cos(angle)*20,y:player.y+Math.sin(angle)*20,vx:Math.cos(angle)*player.bulletSpeed,vy:Math.sin(angle)*player.bulletSpeed,r:player.bulletSize,damage:player.damage})}
 function burst(x,y,n=8){for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-2,2),vy:rand(-2,2),life:rand(15,35)})}
 function update(dt){
